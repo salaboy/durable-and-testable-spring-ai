@@ -101,6 +101,7 @@ Create `src/main/java/com/salaboy/durable/ai/chain/ChainWorkflow.java`:
 ```java
 package com.salaboy.durable.ai.chain;
 
+import io.dapr.durable.ai.patterns.chain.ChainPromptActivity;
 import io.dapr.workflows.Workflow;
 import io.dapr.workflows.WorkflowStub;
 import org.springframework.stereotype.Component;
@@ -109,16 +110,16 @@ import org.springframework.stereotype.Component;
 public class ChainWorkflow implements Workflow {
 
   private static final String[] DEFAULT_SYSTEM_PROMPTS = {
-    // Step 1: Extract metrics
-    """
+      // Step 1: Extract metrics
+      """
     Extract only the numerical values and their associated metrics from the text.
     Format each as 'value: metric' on a new line.
     Example format:
     92: customer satisfaction
     45%: revenue growth""",
 
-    // Step 2: Normalize to percentages
-    """
+      // Step 2: Normalize to percentages
+      """
     Convert all numerical values to percentages where possible.
     If not a percentage or points, convert to decimal (e.g., 92 points -> 92%).
     Keep one number per line.
@@ -126,16 +127,16 @@ public class ChainWorkflow implements Workflow {
     92%: customer satisfaction
     45%: revenue growth""",
 
-    // Step 3: Sort by value
-    """
+      // Step 3: Sort by value
+      """
     Sort all lines in descending order by numerical value.
     Keep the format 'value: metric' on each line.
     Example:
     92%: customer satisfaction
     87%: employee satisfaction""",
 
-    // Step 4: Format as table
-    """
+      // Step 4: Format as table
+      """
     Format the sorted data as a markdown table with columns:
     | Metric | Value |
     |:--|--:|
@@ -153,7 +154,7 @@ public class ChainWorkflow implements Workflow {
       for (String prompt : DEFAULT_SYSTEM_PROMPTS) {
         String input = String.format("{%s}\n {%s}", prompt, response);
         response = ctx.callActivity(ChainPromptActivity.class.getName(),
-                                    input, String.class).await();
+            input, String.class).await();
         ctx.getLogger().info("Step completed: {}", response);
       }
 
@@ -205,6 +206,7 @@ Create `src/main/java/com/salaboy/durable/ai/parallel/ParallelPromptActivity.jav
 ```java
 package com.salaboy.durable.ai.parallel;
 
+import io.dapr.durable.ai.patterns.parallel.ParallelWorkflow;
 import io.dapr.workflows.WorkflowActivityContext;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Component;
@@ -238,6 +240,7 @@ Create `src/main/java/com/salaboy/durable/ai/parallel/ParallelWorkflow.java`:
 ```java
 package com.salaboy.durable.ai.parallel;
 
+import io.dapr.durable.ai.patterns.parallel.ParallelPromptActivity;
 import io.dapr.durabletask.Task;
 import io.dapr.workflows.Workflow;
 import io.dapr.workflows.WorkflowStub;
@@ -260,7 +263,7 @@ public class ParallelWorkflow implements Workflow {
       List<Task<String>> processTasks = workflowInput.inputs()
           .stream()
           .map(input -> ctx.callActivity(ParallelPromptActivity.class.getName(),
-                  new PromptInput(workflowInput.prompt(), input), String.class))
+              new PromptInput(workflowInput.prompt(), input), String.class))
           .collect(Collectors.toList());
 
       // Wait for all tasks to complete
@@ -270,8 +273,11 @@ public class ParallelWorkflow implements Workflow {
     };
   }
 
-  public record WorkflowInput(String prompt, List<String> inputs) {}
-  public record PromptInput(String prompt, String input) {}
+  public record WorkflowInput(String prompt, List<String> inputs) {
+  }
+
+  public record PromptInput(String prompt, String input) {
+  }
 }
 ```
 
@@ -342,6 +348,7 @@ Create `src/main/java/com/salaboy/durable/ai/routing/DetermineRouteActivity.java
 ```java
 package com.salaboy.durable.ai.routing;
 
+import io.dapr.durable.ai.patterns.routing.RoutingRequest;
 import io.dapr.workflows.WorkflowActivityContext;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Component;
@@ -361,8 +368,8 @@ public class DetermineRouteActivity implements io.dapr.workflows.runtime.Workflo
 
     String prompt = String.format(
         "Analyze this support ticket and determine which category it belongs to: %s\n\n" +
-        "Ticket: %s\n\n" +
-        "Return only the category name, nothing else.",
+            "Ticket: %s\n\n" +
+            "Return only the category name, nothing else.",
         request.availableRoutes(), request.input());
 
     return chatClient.prompt()
@@ -382,6 +389,7 @@ Create `src/main/java/com/salaboy/durable/ai/routing/RoutingPromptActivity.java`
 ```java
 package com.salaboy.durable.ai.routing;
 
+import io.dapr.durable.ai.patterns.routing.PromptRequest;
 import io.dapr.workflows.WorkflowActivityContext;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Component;
@@ -415,6 +423,10 @@ Create `src/main/java/com/salaboy/durable/ai/routing/RoutingWorkflow.java`:
 ```java
 package com.salaboy.durable.ai.routing;
 
+import io.dapr.durable.ai.patterns.routing.DetermineRouteActivity;
+import io.dapr.durable.ai.patterns.routing.PromptRequest;
+import io.dapr.durable.ai.patterns.routing.RoutingPromptActivity;
+import io.dapr.durable.ai.patterns.routing.RoutingRequest;
 import io.dapr.workflows.Workflow;
 import io.dapr.workflows.WorkflowStub;
 import org.springframework.stereotype.Component;
@@ -435,9 +447,9 @@ public class RoutingWorkflow implements Workflow {
           3. Explain any charges or discrepancies clearly
           4. List concrete next steps with timeline
           5. End with payment options if relevant
-
+          
           Keep responses professional but friendly.
-
+          
           Input: """,
 
       "technical", """
@@ -447,9 +459,9 @@ public class RoutingWorkflow implements Workflow {
           3. Include system requirements if relevant
           4. Provide workarounds for common problems
           5. End with escalation path if needed
-
+          
           Use clear, numbered steps and technical details.
-
+          
           Input: """,
 
       "account", """
@@ -459,9 +471,9 @@ public class RoutingWorkflow implements Workflow {
           3. Provide clear steps for account recovery/changes
           4. Include security tips and warnings
           5. Set clear expectations for resolution time
-
+          
           Maintain a serious, security-focused tone.
-
+          
           Input: """,
 
       "product", """
@@ -471,9 +483,9 @@ public class RoutingWorkflow implements Workflow {
           3. Include specific examples of usage
           4. Link to relevant documentation sections
           5. Suggest related features that might help
-
+          
           Be educational and encouraging in tone.
-
+          
           Input: """);
 
   @Override
@@ -488,7 +500,7 @@ public class RoutingWorkflow implements Workflow {
       for (String input : inputs) {
         // Determine which route to use
         String routeKey = ctx.callActivity(DetermineRouteActivity.class.getName(),
-                new RoutingRequest(input, supportRoutes.keySet()), String.class).await();
+            new RoutingRequest(input, supportRoutes.keySet()), String.class).await();
 
         String selectedPrompt = supportRoutes.get(routeKey);
         if (selectedPrompt == null) {
@@ -497,7 +509,7 @@ public class RoutingWorkflow implements Workflow {
 
         // Process with the selected route's prompt
         String content = ctx.callActivity(RoutingPromptActivity.class.getName(),
-                new PromptRequest(selectedPrompt, input), String.class).await();
+            new PromptRequest(selectedPrompt, input), String.class).await();
         contents.add(content);
       }
 
@@ -552,6 +564,7 @@ Create `src/main/java/com/salaboy/durable/ai/orchestrator/DefineTasksActivity.ja
 package com.salaboy.durable.ai.orchestrator;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.dapr.durable.ai.patterns.orchestrator.OrchestratorWorkersWorkflow;
 import io.dapr.workflows.WorkflowActivityContext;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Component;
@@ -596,6 +609,7 @@ Create `src/main/java/com/salaboy/durable/ai/orchestrator/ProcessTaskActivity.ja
 ```java
 package com.salaboy.durable.ai.orchestrator;
 
+import io.dapr.durable.ai.patterns.orchestrator.OrchestratorWorkersWorkflow;
 import io.dapr.workflows.WorkflowActivityContext;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Component;
@@ -629,6 +643,8 @@ Create `src/main/java/com/salaboy/durable/ai/orchestrator/OrchestratorWorkersWor
 ```java
 package com.salaboy.durable.ai.orchestrator;
 
+import io.dapr.durable.ai.patterns.orchestrator.DefineTasksActivity;
+import io.dapr.durable.ai.patterns.orchestrator.ProcessTaskActivity;
 import io.dapr.durabletask.Task;
 import io.dapr.workflows.Workflow;
 import io.dapr.workflows.WorkflowStub;
@@ -641,30 +657,35 @@ import java.util.stream.Collectors;
 public class OrchestratorWorkersWorkflow implements Workflow {
 
   public static final String DEFAULT_ORCHESTRATOR_PROMPT = """
-    Analyze this task and break it down into 2-3 distinct approaches:
-
-    Task: {task}
-
-    Return your response in this JSON format:
-    \\{
-    "analysis": "Explain your understanding of the task and which variations would be valuable.
-                 Focus on how each approach serves different aspects of the task.",
-    "tasks": [
+      Analyze this task and break it down into 2-3 distinct approaches:
+      
+      Task: {task}
+      
+      Return your response in this JSON format:
       \\{
-      "type": "formal",
-      "description": "Write a precise, technical version that emphasizes specifications"
-      \\},
-      \\{
-      "type": "conversational",
-      "description": "Write an engaging, friendly version that connects with readers"
+      "analysis": "Explain your understanding of the task and which variations would be valuable.
+                   Focus on how each approach serves different aspects of the task.",
+      "tasks": [
+        \\{
+        "type": "formal",
+        "description": "Write a precise, technical version that emphasizes specifications"
+        \\},
+        \\{
+        "type": "conversational",
+        "description": "Write an engaging, friendly version that connects with readers"
+        \\}
+      ]
       \\}
-    ]
-    \\}
-    """;
+      """;
 
-  public static record OrchestratorResponse(String analysis, List<SubTask> tasks) {}
-  public static record SubTask(String type, String description) {}
-  public static record FinalResponse(String analysis, List<String> workerResponses) {}
+  public static record OrchestratorResponse(String analysis, List<SubTask> tasks) {
+  }
+
+  public static record SubTask(String type, String description) {
+  }
+
+  public static record FinalResponse(String analysis, List<String> workerResponses) {
+  }
 
   @Override
   public WorkflowStub create() {
@@ -759,6 +780,8 @@ Create `src/main/java/com/salaboy/durable/ai/evaluator/GenerateActivity.java`:
 package com.salaboy.durable.ai.evaluator;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.dapr.durable.ai.patterns.evaluator.EvaluatorOptimizer;
+import io.dapr.durable.ai.patterns.evaluator.EvaluatorOptimizerWorkflow;
 import io.dapr.workflows.WorkflowActivityContext;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Component;
@@ -779,17 +802,17 @@ public class GenerateActivity implements io.dapr.workflows.runtime.WorkflowActiv
         ctx.getInput(EvaluatorOptimizerWorkflow.ActivityInput.class);
 
     String prompt = String.format("""
-        Task: %s
-
-        %s
-
-        Generate a response and explain your reasoning.
-        Return JSON format:
-        {
-          "response": "your generated content",
-          "reasoning": "explanation of your approach"
-        }
-        """, input.task(),
+            Task: %s
+            
+            %s
+            
+            Generate a response and explain your reasoning.
+            Return JSON format:
+            {
+              "response": "your generated content",
+              "reasoning": "explanation of your approach"
+            }
+            """, input.task(),
         input.context().isEmpty() ? "" : "\nContext:\n" + input.context());
 
     String response = chatClient.prompt()
@@ -814,6 +837,8 @@ Create `src/main/java/com/salaboy/durable/ai/evaluator/EvaluateActivity.java`:
 package com.salaboy.durable.ai.evaluator;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.dapr.durable.ai.patterns.evaluator.EvaluatorOptimizer;
+import io.dapr.durable.ai.patterns.evaluator.EvaluatorOptimizerWorkflow;
 import io.dapr.workflows.WorkflowActivityContext;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Component;
@@ -835,15 +860,15 @@ public class EvaluateActivity implements io.dapr.workflows.runtime.WorkflowActiv
 
     String prompt = String.format("""
         Evaluate this response for the given task:
-
+        
         Task: %s
         Context: %s
-
+        
         Criteria:
         - Completeness: Addresses all aspects of the task
         - Clarity: Clear and well-structured
         - Accuracy: Information is correct
-
+        
         Return JSON format:
         {
           "evaluation": "PASS" or "FAIL",
@@ -873,6 +898,9 @@ Create `src/main/java/com/salaboy/durable/ai/evaluator/EvaluatorOptimizerWorkflo
 ```java
 package com.salaboy.durable.ai.evaluator;
 
+import io.dapr.durable.ai.patterns.evaluator.EvaluateActivity;
+import io.dapr.durable.ai.patterns.evaluator.EvaluatorOptimizer;
+import io.dapr.durable.ai.patterns.evaluator.GenerateActivity;
 import io.dapr.durabletask.TaskFailedException;
 import io.dapr.workflows.Workflow;
 import io.dapr.workflows.WorkflowStub;
@@ -937,9 +965,11 @@ public class EvaluatorOptimizerWorkflow implements Workflow {
   }
 
   public record IteractionContext(String task, String context, List<String> memory,
-                                   List<EvaluatorOptimizer.Generation> chainOfThought) {}
+                                  List<EvaluatorOptimizer.Generation> chainOfThought) {
+  }
 
-  public record ActivityInput(String task, String context) {}
+  public record ActivityInput(String task, String context) {
+  }
 }
 ```
 
